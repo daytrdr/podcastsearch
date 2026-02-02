@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Podcast, Radio, Database } from "lucide-react";
+import { Podcast, Radio, Database, User } from "lucide-react";
 
 export function Home() {
   return (
@@ -16,7 +16,7 @@ export function Home() {
           </p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
           <Card className="p-6 hover:shadow-md transition-shadow">
             <Link to="/podcast" className="block space-y-4">
               <div className="flex justify-center">
@@ -47,6 +47,25 @@ export function Home() {
                 <h2 className="text-xl font-semibold">Search by Episode</h2>
                 <p className="text-sm text-muted-foreground">
                   Find specific episodes across all podcasts
+                </p>
+              </div>
+              <Button className="w-full" variant="outline">
+                Get Started
+              </Button>
+            </Link>
+          </Card>
+
+          <Card className="p-6 hover:shadow-md transition-shadow">
+            <Link to="/author" className="block space-y-4">
+              <div className="flex justify-center">
+                <div className="p-3 bg-primary/10 rounded-lg">
+                  <User className="size-8 text-primary" />
+                </div>
+              </div>
+              <div className="text-center space-y-2">
+                <h2 className="text-xl font-semibold">Search by Author</h2>
+                <p className="text-sm text-muted-foreground">
+                  Find podcasts by their creators and hosts
                 </p>
               </div>
               <Button className="w-full" variant="outline">

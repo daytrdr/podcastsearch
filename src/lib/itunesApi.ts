@@ -163,9 +163,9 @@ export async function searchEpisodes(term: string, limit: number = 50): Promise<
 
 export async function searchAuthors(term: string, limit: number = 50): Promise<Author[]> {
   if (!term.trim()) return [];
-  
+
   await rateLimit();
-  
+
   try {
     // Search for podcasts and group by artist
     const url = new URL(`${ITUNES_API_BASE}/search`);
@@ -175,34 +175,97 @@ export async function searchAuthors(term: string, limit: number = 50): Promise<A
     url.searchParams.append('limit', String(limit));
     url.searchParams.append('attribute', 'artistTerm');
     url.searchParams.append('country', 'US');
-    
+
     const response = await fetch(url.toString());
-    
+
     if (!response.ok) {
       throw new Error(`iTunes API error: ${response.status}`);
     }
-    
+
     const data: ITunesSearchResponse = await response.json();
-    
+
     // Group podcasts by artist
     const artistMap = new Map<string, { result: ITunesResult; podcasts: ITunesResult[] }>();
-    
+
     data.results.forEach(result => {
       const artistName = result.artistName || 'Unknown Artist';
       const artistId = String(result.artistId || artistName);
-      
+
       if (!artistMap.has(artistId)) {
         artistMap.set(artistId, { result, podcasts: [] });
       }
       artistMap.get(artistId)!.podcasts.push(result);
     });
-    
+
     // Convert to Author objects
     return Array.from(artistMap.values())
       .map(({ result, podcasts }) => mapITunesResultToAuthor(result, podcasts.length))
       .filter(author => author.name.toLowerCase().includes(term.toLowerCase()));
   } catch (error) {
     console.error('Error searching authors:', error);
+    throw error;
+  }
+}
+
+// Media types available in iTunes Search API
+export const ITUNES_MEDIA_TYPES = [
+  { value: 'all', label: 'All' },
+  { value: 'movie', label: 'Movies' },
+  { value: 'podcast', label: 'Podcasts' },
+  { value: 'music', label: 'Music' },
+  { value: 'musicVideo', label: 'Music Videos' },
+  { value: 'audiobook', label: 'Audiobooks' },
+  { value: 'shortFilm', label: 'Short Films' },
+  { value: 'tvShow', label: 'TV Shows' },
+  { value: 'software', label: 'Software' },
+  { value: 'ebook', label: 'eBooks' },
+] as const;
+
+export type ITunesMediaType = typeof ITUNES_MEDIA_TYPES[number]['value'];
+
+// Raw result type that preserves all fields from the API
+export interface ITunesRawResult {
+  [key: string]: unknown;
+}
+
+export interface ITunesGenericSearchResponse {
+  resultCount: number;
+  results: ITunesRawResult[];
+}
+
+export interface SearchAllOptions {
+  term: string;
+  media?: ITunesMediaType;
+  limit?: number;
+  country?: string;
+}
+
+export async function searchAll(options: SearchAllOptions): Promise<ITunesGenericSearchResponse> {
+  const { term, media = 'all', limit = 50, country = 'US' } = options;
+
+  if (!term.trim()) {
+    return { resultCount: 0, results: [] };
+  }
+
+  await rateLimit();
+
+  try {
+    const url = new URL(`${ITUNES_API_BASE}/search`);
+    url.searchParams.append('term', term);
+    url.searchParams.append('media', media);
+    url.searchParams.append('limit', String(limit));
+    url.searchParams.append('country', country);
+
+    const response = await fetch(url.toString());
+
+    if (!response.ok) {
+      throw new Error(`iTunes API error: ${response.status}`);
+    }
+
+    const data: ITunesGenericSearchResponse = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error searching iTunes:', error);
     throw error;
   }
 }

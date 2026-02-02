@@ -16,7 +16,7 @@ export function PodcastSearch() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const { isFavorite, getFavoriteCount, favorites } = useFavorites();
+  const { getFavoriteCount, favorites } = useFavorites();
   
   // Debounce search query
   useEffect(() => {

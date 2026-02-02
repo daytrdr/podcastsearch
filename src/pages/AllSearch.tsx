@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -257,54 +257,37 @@ function ResultCard({ result, index }: { result: ITunesRawResult; index: number 
 
 export function AllSearch() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [searchedQuery, setSearchedQuery] = useState('');
   const [mediaType, setMediaType] = useState<ITunesMediaType>('all');
   const [results, setResults] = useState<ITunesRawResult[]>([]);
   const [resultCount, setResultCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Debounce search query
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedQuery(searchQuery);
-    }, 500);
+  const handleSearch = useCallback(async () => {
+    const query = searchQuery.trim();
+    if (!query) return;
 
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
+    setSearchedQuery(query);
+    setIsLoading(true);
+    setError(null);
 
-  // Fetch results when debounced query or media type changes
-  useEffect(() => {
-    if (!debouncedQuery.trim()) {
+    try {
+      const response = await searchAll({
+        term: query,
+        media: mediaType,
+        limit: 50,
+      });
+      setResults(response.results);
+      setResultCount(response.resultCount);
+    } catch {
+      setError('Failed to search iTunes. Please try again.');
       setResults([]);
       setResultCount(0);
-      setError(null);
-      return;
+    } finally {
+      setIsLoading(false);
     }
-
-    const fetchResults = async () => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const response = await searchAll({
-          term: debouncedQuery,
-          media: mediaType,
-          limit: 50,
-        });
-        setResults(response.results);
-        setResultCount(response.resultCount);
-      } catch (err) {
-        setError('Failed to search iTunes. Please try again.');
-        setResults([]);
-        setResultCount(0);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchResults();
-  }, [debouncedQuery, mediaType]);
+  }, [searchQuery, mediaType]);
 
   // Get unique wrapper types and kinds for stats
   const wrapperTypes = [...new Set(results.map(r => r.wrapperType as string).filter(Boolean))];
@@ -333,7 +316,9 @@ export function AllSearch() {
               <SearchBar
                 value={searchQuery}
                 onChange={setSearchQuery}
+                onSearch={handleSearch}
                 placeholder="Search for anything in iTunes..."
+                isLoading={isLoading}
               />
             </div>
             <Select value={mediaType} onValueChange={(value) => setMediaType(value as ITunesMediaType)}>
@@ -381,7 +366,7 @@ export function AllSearch() {
                   Searching...
                 </span>
               ) : (
-                debouncedQuery && (
+                searchedQuery && (
                   <span>
                     {resultCount} result{resultCount !== 1 ? 's' : ''} returned
                   </span>
@@ -413,9 +398,9 @@ export function AllSearch() {
           ) : (
             <div className="text-center py-12">
               <p className="text-muted-foreground">
-                {!debouncedQuery
-                  ? "Start typing to search the iTunes catalog..."
-                  : `No results found for "${debouncedQuery}". Try a different search or media type.`}
+                {!searchedQuery
+                  ? "Enter a search term and press Search or Enter..."
+                  : `No results found for "${searchedQuery}". Try a different search or media type.`}
               </p>
             </div>
           )}

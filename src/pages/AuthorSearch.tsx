@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Heart, Loader2 } from "lucide-react";
@@ -10,56 +10,40 @@ import type { Author } from "@/types";
 
 export function AuthorSearch() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [searchedQuery, setSearchedQuery] = useState('');
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
   const [searchResults, setSearchResults] = useState<Author[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const { getFavoriteCount, favorites } = useFavorites();
-  
-  // Debounce search query
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedQuery(searchQuery);
-    }, 500);
-    
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-  
-  // Fetch results when debounced query changes
-  useEffect(() => {
-    if (!debouncedQuery.trim()) {
+
+  const handleSearch = useCallback(async () => {
+    const query = searchQuery.trim();
+    if (!query) return;
+
+    setSearchedQuery(query);
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const results = await searchAuthors(query, 50);
+      setSearchResults(results);
+    } catch {
+      setError('Failed to search authors. Please try again.');
       setSearchResults([]);
-      setError(null);
-      return;
+    } finally {
+      setIsLoading(false);
     }
-    
-    const fetchResults = async () => {
-      setIsLoading(true);
-      setError(null);
-      
-      try {
-        const results = await searchAuthors(debouncedQuery, 50);
-        setSearchResults(results);
-      } catch (err) {
-        setError('Failed to search authors. Please try again.');
-        setSearchResults([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchResults();
-  }, [debouncedQuery]);
+  }, [searchQuery]);
   
   // Get favorites for display
   const favoriteAuthors = Array.from(favorites.authors)
     .map(id => searchResults.find(a => a.id === id))
     .filter((a): a is Author => a !== undefined);
-  
-  // Only show results if user has typed something or is viewing favorites
-  const displayedResults = !debouncedQuery && !showOnlyFavorites
+
+  // Only show results if user has searched or is viewing favorites
+  const displayedResults = !searchedQuery && !showOnlyFavorites
     ? []
     : showOnlyFavorites
     ? favoriteAuthors
@@ -83,7 +67,9 @@ export function AuthorSearch() {
           <SearchBar
             value={searchQuery}
             onChange={setSearchQuery}
+            onSearch={handleSearch}
             placeholder="Search authors by name, bio, or genre..."
+            isLoading={isLoading}
           />
 
           <div className="flex items-center justify-between">
@@ -140,15 +126,15 @@ export function AuthorSearch() {
           ) : (
             <div className="text-center py-12">
               <p className="text-muted-foreground">
-                {!debouncedQuery && !showOnlyFavorites
-                  ? "Start typing to search for authors..."
+                {!searchedQuery && !showOnlyFavorites
+                  ? "Enter a search term and press Search or Enter..."
                   : showOnlyFavorites
                   ? favoriteAuthors.length === 0
-                    ? "No favorites yet. Click the ❤️ to save authors."
-                    : debouncedQuery
-                    ? `No favorited authors match "${debouncedQuery}".`
-                    : "No favorites yet. Click the ❤️ to save authors."
-                  : `No authors found for "${debouncedQuery}". Try a different search.`}
+                    ? "No favorites yet. Click the heart to save authors."
+                    : searchedQuery
+                    ? `No favorited authors match "${searchedQuery}".`
+                    : "No favorites yet. Click the heart to save authors."
+                  : `No authors found for "${searchedQuery}". Try a different search.`}
               </p>
             </div>
           )}

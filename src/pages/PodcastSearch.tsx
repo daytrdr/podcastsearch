@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Heart, Loader2 } from "lucide-react";
@@ -10,56 +10,40 @@ import type { Podcast } from "@/types";
 
 export function PodcastSearch() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [searchedQuery, setSearchedQuery] = useState('');
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
   const [searchResults, setSearchResults] = useState<Podcast[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const { getFavoriteCount, favorites } = useFavorites();
-  
-  // Debounce search query
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedQuery(searchQuery);
-    }, 500);
-    
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-  
-  // Fetch results when debounced query changes
-  useEffect(() => {
-    if (!debouncedQuery.trim()) {
+
+  const handleSearch = useCallback(async () => {
+    const query = searchQuery.trim();
+    if (!query) return;
+
+    setSearchedQuery(query);
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const results = await searchPodcasts(query, 50);
+      setSearchResults(results);
+    } catch {
+      setError('Failed to search podcasts. Please try again.');
       setSearchResults([]);
-      setError(null);
-      return;
+    } finally {
+      setIsLoading(false);
     }
-    
-    const fetchResults = async () => {
-      setIsLoading(true);
-      setError(null);
-      
-      try {
-        const results = await searchPodcasts(debouncedQuery, 50);
-        setSearchResults(results);
-      } catch (err) {
-        setError('Failed to search podcasts. Please try again.');
-        setSearchResults([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchResults();
-  }, [debouncedQuery]);
+  }, [searchQuery]);
   
   // Get favorites for display
   const favoritePodcasts = Array.from(favorites.podcasts)
     .map(id => searchResults.find(p => p.id === id))
     .filter((p): p is Podcast => p !== undefined);
-  
-  // Only show results if user has typed something or is viewing favorites
-  const displayedResults = !debouncedQuery && !showOnlyFavorites
+
+  // Only show results if user has searched or is viewing favorites
+  const displayedResults = !searchedQuery && !showOnlyFavorites
     ? []
     : showOnlyFavorites
     ? favoritePodcasts
@@ -83,7 +67,9 @@ export function PodcastSearch() {
           <SearchBar
             value={searchQuery}
             onChange={setSearchQuery}
+            onSearch={handleSearch}
             placeholder="Search podcasts by title, author, or category..."
+            isLoading={isLoading}
           />
 
           <div className="flex items-center justify-between">
@@ -140,15 +126,15 @@ export function PodcastSearch() {
           ) : (
             <div className="text-center py-12">
               <p className="text-muted-foreground">
-                {!debouncedQuery && !showOnlyFavorites
-                  ? "Start typing to search for podcasts..."
+                {!searchedQuery && !showOnlyFavorites
+                  ? "Enter a search term and press Search or Enter..."
                   : showOnlyFavorites
                   ? favoritePodcasts.length === 0
-                    ? "No favorites yet. Click the ❤️ to save podcasts."
-                    : debouncedQuery
-                    ? `No favorited podcasts match "${debouncedQuery}".`
-                    : "No favorites yet. Click the ❤️ to save podcasts."
-                  : `No podcasts found for "${debouncedQuery}". Try a different search.`}
+                    ? "No favorites yet. Click the heart to save podcasts."
+                    : searchedQuery
+                    ? `No favorited podcasts match "${searchedQuery}".`
+                    : "No favorites yet. Click the heart to save podcasts."
+                  : `No podcasts found for "${searchedQuery}". Try a different search.`}
               </p>
             </div>
           )}
